@@ -141,7 +141,7 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({
                                 />
                             </div>
                             <div>
-                                <label htmlFor="external-endpoint-modal" className="block text-sm font-medium text-slate-300 mb-1">Endpoint de la API Externa</p>
+                                <label htmlFor="external-endpoint-modal" className="block text-sm font-medium text-slate-300 mb-1">Endpoint de la API Externa</label>
                                 <input
                                     id="external-endpoint-modal"
                                     type="text"
