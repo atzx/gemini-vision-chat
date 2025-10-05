@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Vision Chat",
+  "description": "A chatbot application that allows users to interact with the Gemini model through text and image prompts, receiving both text and image-based responses.",
+  "requestFramePermissions": []
+}
