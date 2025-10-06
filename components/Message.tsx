@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ChatMessage, MessagePart } from '../types';
+import ImageModal from './ImageModal';
 
 interface MessageProps {
     message: ChatMessage;
@@ -22,17 +23,29 @@ const ModelIcon = () => (
 );
 
 const MessageContent: React.FC<{ part: MessagePart }> = ({ part }) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const imageUrl = part.inlineData ? `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` : '';
+
     if (part.text) {
         return <p className="whitespace-pre-wrap">{part.text}</p>;
     }
 
     if (part.inlineData) {
         return (
-            <img 
-                src={`data:${part.inlineData.mimeType};base64,${part.inlineData.data}`} 
-                alt="Chat content"
-                className="rounded-lg max-w-sm"
-            />
+            <>
+                <img 
+                    src={imageUrl} 
+                    alt="Chat content"
+                    className="rounded-lg max-w-sm cursor-pointer"
+                    onClick={() => setIsModalOpen(true)}
+                />
+                {isModalOpen && (
+                    <ImageModal 
+                        imageUrl={imageUrl} 
+                        onClose={() => setIsModalOpen(false)} 
+                    />
+                )}
+            </>
         );
     }
 
