@@ -47,12 +47,12 @@ const ImageEditModal: React.FC<ImageEditModalProps> = ({ isOpen, onClose, images
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
-                <div className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-900 rounded-lg">
+                <div className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-900 rounded-lg overflow-auto">
                     {images[selectedIndex] && (
                         <img
                             src={images[selectedIndex]}
                             alt="Selected for editing"
-                            className="max-h-full max-w-full rounded-md"
+                            className="w-full h-full object-contain rounded-md"
                             style={{
                                 transform: `rotate(${imageFilters.rotation}deg)`,
                                 filter: applyFilters(),
@@ -61,18 +61,20 @@ const ImageEditModal: React.FC<ImageEditModalProps> = ({ isOpen, onClose, images
                     )}
                 </div>
                 <div className="w-1/3 flex flex-col gap-4">
-                    <div className="flex-1 overflow-y-auto bg-slate-900 p-2 rounded-lg">
+                    <div className="flex-1 bg-slate-900 p-2 rounded-lg">
                         <h3 className="text-white text-lg mb-2 font-semibold">Images</h3>
-                        <div className="grid grid-cols-2 gap-2">
-                            {images.map((img, index) => (
-                                <img
-                                    key={index}
-                                    src={img}
-                                    alt={`Thumbnail ${index}`}
-                                    className={`w-full h-auto object-cover rounded-md cursor-pointer transition-all duration-200 ${selectedIndex === index ? 'ring-2 ring-purple-500' : 'opacity-70 hover:opacity-100'}`}
-                                    onClick={() => onSelect(index)}
-                                />
-                            ))}
+                        <div className="overflow-auto h-full">
+                            <div className="grid grid-cols-2 gap-2">
+                                {images.map((img, index) => (
+                                    <img
+                                        key={index}
+                                        src={img}
+                                        alt={`Thumbnail ${index}`}
+                                        className={`w-full h-full object-cover rounded-md cursor-pointer transition-all duration-200 ${selectedIndex === index ? 'ring-2 ring-purple-500' : 'opacity-70 hover:opacity-100'}`}
+                                        onClick={() => onSelect(index)}
+                                    />
+                                ))}
+                            </div>
                         </div>
                     </div>
                     <div className="bg-slate-900 p-2 rounded-lg">

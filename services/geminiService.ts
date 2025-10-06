@@ -133,14 +133,8 @@ export async function runQuery(
 ): Promise<MessagePart[]> {
     try {
         if (apiConfig.provider === 'gemini') {
-            let effectiveApiKey = apiConfig.apiKey;
-            if (apiConfig.apiKey === 'USE_GOOGLE_AI_STUDIO') {
-                effectiveApiKey = process.env.API_KEY;
-                if (!effectiveApiKey) {
-                    throw new Error("The 'Google AI Studio (System)' provider is selected, but no API key was found in the environment. This option is only available when run in a compatible, hosted environment.");
-                }
-            }
-             if (!effectiveApiKey) {
+            const effectiveApiKey = apiConfig.apiKey;
+            if (!effectiveApiKey || effectiveApiKey === 'USE_GOOGLE_AI_STUDIO') {
                 throw new Error("Gemini API key is not configured. Please select 'Google Gemini (Personal Key)' and provide your API key in the API settings.");
             }
 

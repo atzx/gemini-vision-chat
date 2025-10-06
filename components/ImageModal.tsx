@@ -13,12 +13,12 @@ const ImageModal: React.FC<ImageModalProps> = ({ imageUrl, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="relative" onClick={e => e.stopPropagation()}>
+      <div className="relative max-w-[90vw] max-h-[90vh] overflow-auto rounded-lg" onClick={e => e.stopPropagation()}>
         <img 
           src={imageUrl} 
           alt="Enlarged content" 
-          className="max-w-screen-lg max-h-screen-lg transition-transform duration-200"
-          style={{ transform: `scale(${zoom})` }}
+          className="transition-transform duration-200"
+          style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
         />
       </div>
       <button 

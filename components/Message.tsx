@@ -33,12 +33,14 @@ const MessageContent: React.FC<{ part: MessagePart }> = ({ part }) => {
     if (part.inlineData) {
         return (
             <>
-                <img 
-                    src={imageUrl} 
-                    alt="Chat content"
-                    className="rounded-lg max-w-sm cursor-pointer"
-                    onClick={() => setIsModalOpen(true)}
-                />
+                <div className="max-w-sm max-h-[400px] overflow-auto rounded-lg">
+                    <img 
+                        src={imageUrl} 
+                        alt="Chat content"
+                        className="w-full h-full object-contain cursor-pointer"
+                        onClick={() => setIsModalOpen(true)}
+                    />
+                </div>
                 {isModalOpen && (
                     <ImageModal 
                         imageUrl={imageUrl} 
