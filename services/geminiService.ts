@@ -22,10 +22,12 @@ async function runImageGenerationQuery(apiKey: string, prompt: string): Promise<
     });
 
     if (response.generatedImages && response.generatedImages.length > 0) {
+        const imageBytes = response.generatedImages[0].image.imageBytes;
+        const base64Data = typeof imageBytes === 'string' ? imageBytes : btoa(String.fromCharCode(...new Uint8Array(imageBytes as any)));
         return [{
             inlineData: {
                 mimeType: 'image/png',
-                data: response.generatedImages[0].image.imageBytes,
+                data: base64Data,
             }
         }];
     }

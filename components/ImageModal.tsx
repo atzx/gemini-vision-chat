@@ -21,6 +21,12 @@ const ImageModal: React.FC<ImageModalProps> = ({ imageUrl, onClose }) => {
           style={{ transform: `scale(${zoom})` }}
         />
       </div>
+      <button 
+        onClick={onClose} 
+        className="fixed top-4 right-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full w-12 h-12 flex items-center justify-center text-2xl z-[9999]"
+      >
+        &times;
+      </button>
       <div className="fixed bottom-4 right-4 flex space-x-2" onClick={e => e.stopPropagation()}>
         <button onClick={handleZoomIn} className="bg-gray-800 text-white p-2 rounded-full">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
