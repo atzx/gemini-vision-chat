@@ -35,14 +35,14 @@ async function runImageGenerationQuery(apiKey: string, prompt: string): Promise<
 }
 
 
-async function runGeminiQuery(apiKey: string, prompt: string, image?: { mimeType: string, data: string }, isImageEditMode?: boolean): Promise<MessagePart[]> {
+async function runGeminiQuery(apiKey: string, prompt: string, images?: { mimeType: string, data: string }[], isImageEditMode?: boolean): Promise<MessagePart[]> {
     const ai = new GoogleGenAI({ apiKey });
 
-    if (image) {
-        const imagePart = { inlineData: { mimeType: image.mimeType, data: image.data } };
+    if (images && images.length > 0) {
+        const imageParts = images.map(image => ({ inlineData: { mimeType: image.mimeType, data: image.data } }));
         const textPart = { text: prompt };
         const modelName = isImageEditMode ? 'gemini-2.5-flash-image-preview' : 'gemini-2.5-flash';
-        const contents = { parts: [imagePart, textPart] };
+        const contents = { parts: [...imageParts, textPart] };
 
         if (isImageEditMode) {
             const response = await ai.models.generateContent({
@@ -79,19 +79,21 @@ async function runGeminiQuery(apiKey: string, prompt: string, image?: { mimeType
     }
 }
 
-async function runExternalQuery(apiKey: string, endpoint: string, prompt: string, image?: { mimeType: string, data: string }): Promise<MessagePart[]> {
+async function runExternalQuery(apiKey: string, endpoint: string, prompt: string, images?: { mimeType: string, data: string }[]): Promise<MessagePart[]> {
     const headers = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
     };
 
     const content: any[] = [{ type: 'text', text: prompt }];
-    if (image) {
-        content.push({
-            type: 'image_url',
-            image_url: {
-                url: `data:${image.mimeType};base64,${image.data}`,
-            },
+    if (images) {
+        images.forEach(image => {
+            content.push({
+                type: 'image_url',
+                image_url: {
+                    url: `data:${image.mimeType};base64,${image.data}`,
+                },
+            });
         });
     }
 
@@ -126,7 +128,7 @@ async function runExternalQuery(apiKey: string, endpoint: string, prompt: string
 export async function runQuery(
     apiConfig: ApiConfig, 
     prompt: string, 
-    image?: { mimeType: string, data: string },
+    images?: { mimeType: string, data: string }[],
     options?: { isImageEditMode?: boolean, isImageGenerationMode?: boolean }
 ): Promise<MessagePart[]> {
     try {
@@ -146,7 +148,7 @@ export async function runQuery(
                  if (!prompt) throw new Error("A text prompt is required for image generation.");
                  return await runImageGenerationQuery(effectiveApiKey, prompt);
             }
-            return await runGeminiQuery(effectiveApiKey, prompt, image, options?.isImageEditMode);
+            return await runGeminiQuery(effectiveApiKey, prompt, images, options?.isImageEditMode);
 
         } else if (apiConfig.provider === 'external') {
              if (!apiConfig.endpoint || !apiConfig.apiKey) {
@@ -155,7 +157,7 @@ export async function runQuery(
              if (options?.isImageGenerationMode) {
                 throw new Error("Image generation is not supported with an external API provider.");
             }
-            return await runExternalQuery(apiConfig.apiKey, apiConfig.endpoint, prompt, image);
+            return await runExternalQuery(apiConfig.apiKey, apiConfig.endpoint, prompt, images);
         } else {
             throw new Error('Invalid API provider specified.');
         }

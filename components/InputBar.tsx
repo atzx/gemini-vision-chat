@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ImageEditModal from './ImageEditModal';
 
 interface InputBarProps {
     onSend: (
         prompt: string, 
-        image?: { mimeType:string, data: string },
+        images?: { mimeType:string, data: string }[],
         options?: { isImageEditMode?: boolean, isImageGenerationMode?: boolean }
     ) => void;
     isLoading: boolean;
@@ -27,21 +28,20 @@ const fileToBase64 = (file: File): Promise<{ mimeType: string, data: string }> =
 
 const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false }) => {
     const [prompt, setPrompt] = useState('');
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [isImageEditMode, setIsImageEditMode] = useState(false);
+    const [imageFiles, setImageFiles] = useState<File[]>([]);
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [isImageGenerationMode, setIsImageGenerationMode] = useState(false);
+    const [imageFilters, setImageFilters] = useState<any[]>([]);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const isDisabled = isLoading || disabled;
 
     useEffect(() => {
-        if (imageFile) {
+        if (imageFiles.length > 0) {
             setIsImageGenerationMode(false); // Cannot generate if image is attached
         }
-        if (!imageFile) {
-            setIsImageEditMode(false); // Cannot edit if no image is attached
-        }
-    }, [imageFile]);
+    }, [imageFiles]);
 
      useEffect(() => {
         if (!prompt.trim()) {
@@ -51,14 +51,18 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
 
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            setImageFile(file);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImagePreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
+        const files = event.target.files;
+        if (files) {
+            const newFiles = Array.from(files);
+            setImageFiles(prev => [...prev, ...newFiles]);
+            newFiles.forEach(file => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setImagePreviews(prev => [...prev, reader.result as string]);
+                    setImageFilters(prev => [...prev, { rotation: 0, inverted: false, sepia: false }]);
+                };
+                reader.readAsDataURL(file);
+            });
         }
     };
     
@@ -69,13 +73,13 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                 const file = items[i].getAsFile();
                 if (file) {
                     event.preventDefault();
-                    setImageFile(file);
+                    setImageFiles(prev => [...prev, file]);
                     const reader = new FileReader();
                     reader.onloadend = () => {
-                        setImagePreview(reader.result as string);
+                        setImagePreviews(prev => [...prev, reader.result as string]);
+                        setImageFilters(prev => [...prev, { rotation: 0, inverted: false, sepia: false }]);
                     };
                     reader.readAsDataURL(file);
-                    break; // Stop after finding the first image
                 }
             }
         }
@@ -83,20 +87,82 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
 
 
     const handleSend = async () => {
-        if (isDisabled || (!prompt.trim() && !imageFile)) return;
+        if (isDisabled || (!prompt.trim() && imageFiles.length === 0)) return;
 
-        let imagePayload: { mimeType: string, data: string } | undefined = undefined;
-        if (imageFile) {
-            imagePayload = await fileToBase64(imageFile);
-        }
+        const applyFiltersToImage = (imageUrl: string, filters: any): Promise<{ mimeType: string, data: string }> => {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    // Temp canvas for filtering
+                    const tempCanvas = document.createElement('canvas');
+                    const tempCtx = tempCanvas.getContext('2d');
+                    if (!tempCtx) return reject(new Error('Could not get canvas context'));
+                    tempCanvas.width = img.width;
+                    tempCanvas.height = img.height;
+                    tempCtx.drawImage(img, 0, 0);
 
-        onSend(prompt, imagePayload, { isImageEditMode, isImageGenerationMode });
+                    if (filters.inverted || filters.sepia) {
+                        const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                        const data = imageData.data;
+                        for (let i = 0; i < data.length; i += 4) {
+                            let r = data[i], g = data[i + 1], b = data[i + 2];
+                            if (filters.inverted) {
+                                r = 255 - r;
+                                g = 255 - g;
+                                b = 255 - b;
+                            }
+                            if (filters.sepia) {
+                                const sr = r * 0.393 + g * 0.769 + b * 0.189;
+                                const sg = r * 0.349 + g * 0.686 + b * 0.168;
+                                const sb = r * 0.272 + g * 0.534 + b * 0.131;
+                                r = Math.min(255, sr);
+                                g = Math.min(255, sg);
+                                b = Math.min(255, sb);
+                            }
+                            data[i] = r;
+                            data[i + 1] = g;
+                            data[i + 2] = b;
+                        }
+                        tempCtx.putImageData(imageData, 0, 0);
+                    }
+
+                    // Final canvas for rotation
+                    const finalCanvas = document.createElement('canvas');
+                    const finalCtx = finalCanvas.getContext('2d');
+                    if (!finalCtx) return reject(new Error('Could not get canvas context'));
+
+                    if (filters.rotation === 90 || filters.rotation === 270) {
+                        finalCanvas.width = img.height;
+                        finalCanvas.height = img.width;
+                    } else {
+                        finalCanvas.width = img.width;
+                        finalCanvas.height = img.height;
+                    }
+
+                    finalCtx.translate(finalCanvas.width / 2, finalCanvas.height / 2);
+                    finalCtx.rotate(filters.rotation * Math.PI / 180);
+                    finalCtx.drawImage(tempCanvas, -img.width / 2, -img.height / 2);
+
+                    const dataUrl = finalCanvas.toDataURL('image/png');
+                    const data = dataUrl.split(',')[1];
+                    resolve({ mimeType: 'image/png', data });
+                };
+                img.onerror = reject;
+                img.src = imageUrl;
+            });
+        };
+
+        const imagePayloads = await Promise.all(
+            imagePreviews.map((preview, index) => applyFiltersToImage(preview, imageFilters[index]))
+        );
+
+        onSend(prompt, imagePayloads, { isImageEditMode: imageFiles.length > 0, isImageGenerationMode });
 
         setPrompt('');
-        setImageFile(null);
-        setImagePreview(null);
-        setIsImageEditMode(false);
-        setIsImageGenerationMode(false);
+        setImageFiles([]);
+        setImagePreviews([]);
+        setImageFilters([]);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -109,30 +175,53 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
         }
     };
 
-    const removeImage = () => {
-        setImageFile(null);
-        setImagePreview(null);
+    const removeImage = (index: number) => {
+        setImageFiles(prev => prev.filter((_, i) => i !== index));
+        setImagePreviews(prev => prev.filter((_, i) => i !== index));
+        setImageFilters(prev => prev.filter((_, i) => i !== index));
         if(fileInputRef.current) {
             fileInputRef.current.value = '';
         }
     };
 
+    const handleUpdateFilters = (index: number, filters: any) => {
+        setImageFilters(prev => prev.map((f, i) => i === index ? filters : f));
+    };
+
     return (
-        <footer className="bg-slate-800/70 backdrop-blur-sm p-4 border-t border-slate-700">
-            <div className="max-w-4xl mx-auto">
-                {imagePreview && (
-                    <div className="mb-2 relative w-fit">
-                        <img src={imagePreview} alt="Preview" className="h-24 w-auto rounded-lg" />
-                        <button 
-                            onClick={removeImage} 
-                            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full h-6 w-6 flex items-center justify-center hover:bg-red-700 transition-colors"
-                            aria-label="Remove image"
-                        >
-                            &times;
-                        </button>
-                    </div>
-                )}
-                <div className="relative flex items-end bg-slate-700 rounded-lg p-2 gap-1">
+        <>
+            <ImageEditModal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                images={imagePreviews}
+                onUpdate={handleUpdateFilters}
+                onSelect={setSelectedImageIndex}
+                selectedIndex={selectedImageIndex}
+                initialFilters={imageFilters[selectedImageIndex]}
+            />
+            <footer className="bg-slate-800/70 backdrop-blur-sm p-4 border-t border-slate-700">
+                <div className="max-w-4xl mx-auto">
+                    {imagePreviews.length > 0 && (
+                        <div className="mb-2 flex gap-2 flex-wrap">
+                            {imagePreviews.map((preview, index) => (
+                                <div key={index} className="relative w-fit">
+                                    <img 
+                                        src={preview} 
+                                        alt={`Preview ${index}`} 
+                                        className="h-24 w-auto rounded-lg"
+                                    />
+                                    <button 
+                                        onClick={() => removeImage(index)} 
+                                        className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full h-6 w-6 flex items-center justify-center hover:bg-red-700 transition-colors"
+                                        aria-label={`Remove image ${index}`}
+                                    >
+                                        &times;
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    <div className="relative flex items-end bg-slate-700 rounded-lg p-2 gap-1">
                     <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isDisabled}
@@ -150,14 +239,13 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                         onChange={handleFileChange}
                         className="hidden"
                         accept="image/*"
+                        multiple
                         disabled={isDisabled}
                     />
                     <button
-                        onClick={() => setIsImageEditMode(prev => !prev)}
-                        disabled={isDisabled || !imageFile}
-                        className={`p-2 rounded-lg transition-colors ${
-                            isImageEditMode ? 'bg-purple-600 text-white' : 'text-slate-400'
-                        } hover:text-purple-400 disabled:opacity-50 disabled:hover:text-slate-400 disabled:cursor-not-allowed`}
+                        onClick={() => setIsEditModalOpen(true)}
+                        disabled={isDisabled || imageFiles.length === 0}
+                        className={`p-2 rounded-lg transition-colors text-slate-400 hover:text-purple-400 disabled:opacity-50 disabled:hover:text-slate-400 disabled:cursor-not-allowed`}
                         aria-label="Toggle Image Edit Mode"
                         title="Toggle Image Edit Mode"
                     >
@@ -165,7 +253,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                     </button>
                      <button
                         onClick={() => setIsImageGenerationMode(prev => !prev)}
-                        disabled={isDisabled || !!imageFile || !prompt.trim()}
+                        disabled={isDisabled || imageFiles.length > 0 || !prompt.trim()}
                         className={`p-2 rounded-lg transition-colors ${
                             isImageGenerationMode ? 'bg-cyan-500 text-white' : 'text-slate-400'
                         } hover:text-cyan-400 disabled:opacity-50 disabled:hover:text-slate-400 disabled:cursor-not-allowed`}
@@ -186,7 +274,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                     />
                     <button
                         onClick={handleSend}
-                        disabled={isDisabled || (!prompt.trim() && !imageFile)}
+                        disabled={isDisabled || (!prompt.trim() && imageFiles.length === 0)}
                         className="p-2 rounded-full bg-cyan-500 text-white hover:bg-cyan-600 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
                         aria-label="Send message"
                     >
@@ -198,9 +286,10 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                             </svg>
                         )}
                     </button>
+                    </div>
                 </div>
-            </div>
-        </footer>
+            </footer>
+        </>
     );
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { ChatMessage } from './types';
+import { ChatMessage, MessagePart } from './types';
 import { runQuery, ApiConfig } from './services/geminiService';
 import Header from './components/Header';
 import ChatWindow from './components/ChatWindow';
@@ -44,10 +44,10 @@ const App: React.FC = () => {
 
     const handleSend = useCallback(async (
         prompt: string, 
-        image?: { mimeType: string, data: string },
+        images?: { mimeType: string, data: string }[],
         options?: { isImageEditMode?: boolean, isImageGenerationMode?: boolean }
     ) => {
-        if (!prompt && !image) return;
+        if (!prompt && (!images || images.length === 0)) return;
         if (!isApiConfigured) {
             setIsApiModalOpen(true);
             return;
@@ -55,10 +55,13 @@ const App: React.FC = () => {
 
         setIsLoading(true);
 
-        const userParts = [];
-        // Only show prompt text if not in generation mode, as the prompt is the command itself.
+        const userParts: MessagePart[] = [];
         if (prompt && !options?.isImageGenerationMode) userParts.push({ text: prompt });
-        if (image) userParts.push({ inlineData: { mimeType: image.mimeType, data: image.data }});
+        if (images) {
+            images.forEach(image => {
+                userParts.push({ inlineData: { mimeType: image.mimeType, data: image.data }});
+            });
+        }
         if (options?.isImageGenerationMode) {
              userParts.push({ text: `*Generando imagen a partir de: "${prompt}"*` });
         }
@@ -66,7 +69,7 @@ const App: React.FC = () => {
         const userMessage: ChatMessage = {
             id: `user-${Date.now()}`,
             role: 'user',
-            parts: userParts.length > 0 ? userParts : [{text: prompt}], // Fallback for pure generation
+            parts: userParts.length > 0 ? userParts : [{text: prompt}],
         };
 
         setMessages(prev => [...prev, userMessage]);
@@ -79,7 +82,7 @@ const App: React.FC = () => {
         }
 
         try {
-            const modelParts = await runQuery(apiConfig, prompt, image, options);
+            const modelParts = await runQuery(apiConfig, prompt, images, options);
             const modelMessage: ChatMessage = {
                 id: `model-${Date.now()}`,
                 role: modelParts[0]?.text?.toLowerCase().startsWith('error:') ? 'error' : 'model',
