@@ -35,7 +35,15 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const isDisabled = isLoading || disabled;
+
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    }, [prompt]);
 
     useEffect(() => {
         if (imageFiles.length > 0) {
@@ -267,10 +275,12 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                         onChange={(e) => setPrompt(e.target.value)}
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
+                        ref={textareaRef}
                         placeholder={disabled ? "Please configure your API key in the header." : "Type your message or add an image..."}
-                        className="flex-1 bg-transparent resize-none focus:outline-none p-2 text-slate-100 placeholder-slate-400 max-h-40"
+                        className="flex-1 bg-transparent resize-none focus:outline-none p-2 text-slate-100 placeholder-slate-400 max-h-[18rem] overflow-y-auto"
                         rows={1}
                         disabled={isDisabled}
+                        style={{ height: 'auto' }}
                     />
                     <button
                         onClick={handleSend}
