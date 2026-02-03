@@ -83,7 +83,16 @@ const ImageEditModal: React.FC<ImageEditModalProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Store layout metrics for cropping the drawing later
+  const layoutMetricsRef = useRef({ 
+    offsetX: 0, 
+    offsetY: 0, 
+    displayWidth: 0, 
+    displayHeight: 0 
+  });
 
+  // Initialize canvas when image loads
   useEffect(() => {
     setImageFilters(initialFilters || defaultFilters);
     // Clear canvas and text annotations when switching images
@@ -103,17 +112,86 @@ const ImageEditModal: React.FC<ImageEditModalProps> = ({
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         imageRef.current = img;
-        const container = containerRef.current;
-        if (container && canvasRef.current) {
-          // Set canvas size to match container
-          const rect = container.getBoundingClientRect();
-          canvasRef.current.width = rect.width;
-          canvasRef.current.height = rect.height;
-        }
+        // Wait for image to render in DOM before positioning canvas
+        requestAnimationFrame(() => {
+          updateCanvasSize();
+        });
       };
       img.src = images[selectedIndex];
     }
   }, [images, selectedIndex]);
+
+  // Update canvas size on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      updateCanvasSize();
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Update canvas size when tab changes to draw
+  useEffect(() => {
+    if (activeTab === 'draw' || activeTab === 'text') {
+      requestAnimationFrame(() => {
+        updateCanvasSize();
+      });
+    }
+  }, [activeTab]);
+
+  // Update canvas size when filters change (rotation affects dimensions)
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      updateCanvasSize();
+    });
+  }, [imageFilters.rotation, imageFilters.blur, imageFilters.inverted, imageFilters.sepia, imageFilters.grayscale, imageFilters.brightness, imageFilters.contrast]);
+
+  const updateCanvasSize = () => {
+    const img = imageRef.current;
+    const container = containerRef.current;
+    const canvas = canvasRef.current;
+    
+    if (!img || !container || !canvas) return;
+
+    // Get container dimensions (the full available area)
+    const containerRect = container.getBoundingClientRect();
+    
+    // Set canvas to fill the entire container
+    canvas.width = containerRect.width;
+    canvas.height = containerRect.height;
+    
+    // Reset positioning to fill container
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.left = '0';
+    canvas.style.top = '0';
+    canvas.style.position = 'absolute';
+
+    // Calculate metrics for saving (to crop later)
+    const containerWidth = containerRect.width - 32; // Subtract padding
+    const containerHeight = containerRect.height - 32;
+    
+    const isRotated = imageFilters.rotation === 90 || imageFilters.rotation === 270;
+    const imgWidth = isRotated ? img.height : img.width;
+    const imgHeight = isRotated ? img.width : img.height;
+    
+    const imgAspectRatio = imgWidth / imgHeight;
+    const containerAspectRatio = containerWidth / containerHeight;
+    
+    let displayWidth, displayHeight;
+    if (imgAspectRatio > containerAspectRatio) {
+      displayWidth = containerWidth;
+      displayHeight = containerWidth / imgAspectRatio;
+    } else {
+      displayHeight = containerHeight;
+      displayWidth = containerHeight * imgAspectRatio;
+    }
+    
+    const offsetX = (containerRect.width - displayWidth) / 2;
+    const offsetY = (containerRect.height - displayHeight) / 2;
+
+    layoutMetricsRef.current = { offsetX, offsetY, displayWidth, displayHeight };
+  };
 
   if (!isOpen) return null;
 
@@ -132,7 +210,28 @@ const ImageEditModal: React.FC<ImageEditModalProps> = ({
     // Combine canvas drawing with image
     let drawingData: string | undefined;
     if (canvasRef.current && (textAnnotations.length > 0 || hasDrawing())) {
-      drawingData = canvasRef.current.toDataURL('image/png');
+      // Create a temporary canvas to crop the drawing to the image area
+      const tempCanvas = document.createElement('canvas');
+      const { offsetX, offsetY, displayWidth, displayHeight } = layoutMetricsRef.current;
+      
+      // Ensure we have valid dimensions
+      if (displayWidth > 0 && displayHeight > 0) {
+        tempCanvas.width = displayWidth;
+        tempCanvas.height = displayHeight;
+        const ctx = tempCanvas.getContext('2d');
+        if (ctx) {
+            // Draw only the part of the main canvas where the image is
+            ctx.drawImage(
+                canvasRef.current,
+                offsetX, offsetY, displayWidth, displayHeight, // Source crop
+                0, 0, displayWidth, displayHeight // Destination
+            );
+            drawingData = tempCanvas.toDataURL('image/png');
+        }
+      } else {
+        // Fallback if something is wrong with metrics
+        drawingData = canvasRef.current.toDataURL('image/png');
+      }
     }
     onUpdate(selectedIndex, imageFilters, drawingData);
     onClose();
@@ -158,10 +257,17 @@ const ImageEditModal: React.FC<ImageEditModalProps> = ({
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>): { x: number; y: number } => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
+    
+    // Using native offset is reliable because it's relative to the target element (canvas)
+    // and accounts for border-box/padding-box.
+    // We also correct for any resolution mismatch.
     const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+      x: e.nativeEvent.offsetX * scaleX,
+      y: e.nativeEvent.offsetY * scaleY
     };
   };
 
@@ -330,7 +436,7 @@ const ImageEditModal: React.FC<ImageEditModalProps> = ({
         </button>
         
         {/* Image Preview Area */}
-        <div ref={containerRef} className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-900 rounded-lg overflow-auto relative">
+        <div ref={containerRef} className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-900 rounded-lg overflow-hidden relative">
           {images[selectedIndex] && (
             <>
               <img
@@ -348,7 +454,7 @@ const ImageEditModal: React.FC<ImageEditModalProps> = ({
                 onMouseMove={draw}
                 onMouseUp={stopDrawing}
                 onMouseLeave={stopDrawing}
-                className="absolute top-0 left-0 w-full h-full cursor-crosshair"
+                className="absolute inset-0 w-full h-full cursor-crosshair"
                 style={{ zIndex: 10 }}
               />
             </>
