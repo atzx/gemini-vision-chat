@@ -57,3 +57,20 @@ Thumbs.db
 *.tmp
 *.temp
 .cache/
+
+# Generated Images - NEVER commit these to GitHub!
+generated-images/
+generated-images/*
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.bmp
+*.svg
+!public/*.png
+!public/*.jpg
+!public/*.jpeg
+!public/*.gif
+!public/*.webp
+!public/*.svg
