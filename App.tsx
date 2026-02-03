@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { ChatMessage, MessagePart, OpenRouterModelId, OPENROUTER_MODELS } from './types';
 import { runQuery, ApiConfig } from './services/geminiService';
+import { extractAndSaveImage } from './services/imageHistoryService';
 import Header from './components/Header';
 import ChatWindow from './components/ChatWindow';
 import InputBar from './components/InputBar';
 import ApiConfigModal from './components/ApiConfigModal';
 import { ApiModalConfig } from './components/ApiConfigModal';
+import ImageHistory from './components/ImageHistory';
 
 const App: React.FC = () => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -221,6 +223,12 @@ const App: React.FC = () => {
                 parts: modelParts,
             };
             setMessages(prev => [...prev, modelMessage]);
+            
+            // Guardar imágenes generadas en el historial
+            if (options?.isImageGenerationMode && !modelParts[0]?.text?.startsWith('Error:')) {
+                console.log('Saving generated images to history...', modelParts);
+                extractAndSaveImage(modelParts, prompt);
+            }
         } catch (error) {
             console.error(error);
             const errorMessage: ChatMessage = {
@@ -254,8 +262,16 @@ const App: React.FC = () => {
                 currentExternalEndpoint={externalApiEndpoint}
                 currentExternalModel={externalApiModel}
             />
-            <ChatWindow messages={messages} isLoading={isLoading} />
-            <InputBar onSend={handleSend} isLoading={isLoading} disabled={!isApiConfigured} />
+            <div className="flex flex-1 overflow-hidden">
+                {/* Panel de Historial de Imágenes */}
+                <ImageHistory />
+                
+                {/* Área Principal del Chat */}
+                <div className="flex-1 flex flex-col min-w-0">
+                    <ChatWindow messages={messages} isLoading={isLoading} />
+                    <InputBar onSend={handleSend} isLoading={isLoading} disabled={!isApiConfigured} />
+                </div>
+            </div>
         </div>
     );
 };
