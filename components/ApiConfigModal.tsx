@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { OpenRouterModelId, OPENROUTER_MODELS } from '../types';
 
 type SelectedProvider = 'gemini_studio' | 'gemini_custom' | 'external';
 
@@ -7,6 +8,7 @@ export interface ApiModalConfig {
     geminiKey: string;
     externalKey: string;
     externalEndpoint: string;
+    externalModel?: OpenRouterModelId;
 }
 
 interface ApiConfigModalProps {
@@ -17,6 +19,7 @@ interface ApiConfigModalProps {
     currentGeminiKey: string;
     currentExternalKey: string;
     currentExternalEndpoint: string;
+    currentExternalModel?: OpenRouterModelId;
 }
 
 const ApiConfigModal: React.FC<ApiConfigModalProps> = ({
@@ -26,13 +29,15 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({
     currentProvider,
     currentGeminiKey,
     currentExternalKey,
-    currentExternalEndpoint
+    currentExternalEndpoint,
+    currentExternalModel = 'google/gemini-2.5-flash-image'
 }) => {
     
     const [selectedProvider, setSelectedProvider] = useState<SelectedProvider>('gemini_custom');
     const [geminiKey, setGeminiKey] = useState(currentGeminiKey);
     const [externalKey, setExternalKey] = useState(currentExternalKey);
     const [externalEndpoint, setExternalEndpoint] = useState(currentExternalEndpoint);
+    const [externalModel, setExternalModel] = useState<OpenRouterModelId>(currentExternalModel);
 
     useEffect(() => {
         if (isOpen) {
@@ -49,8 +54,9 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({
             setGeminiKey(currentGeminiKey === 'USE_GOOGLE_AI_STUDIO' ? '' : currentGeminiKey);
             setExternalKey(currentExternalKey);
             setExternalEndpoint(currentExternalEndpoint);
+            setExternalModel(currentExternalModel);
         }
-    }, [isOpen, currentProvider, currentGeminiKey, currentExternalKey, currentExternalEndpoint]);
+    }, [isOpen, currentProvider, currentGeminiKey, currentExternalKey, currentExternalEndpoint, currentExternalModel]);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -74,6 +80,7 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({
             geminiKey,
             externalKey,
             externalEndpoint,
+            externalModel,
         });
     };
 
@@ -103,7 +110,7 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({
                         </label>
                         <label className="flex items-center space-x-2 cursor-pointer p-2 rounded-md hover:bg-slate-700/50 transition-colors">
                             <input type="radio" name="provider" value="external" checked={selectedProvider === 'external'} onChange={() => setSelectedProvider('external')} className="form-radio text-cyan-500 bg-slate-700 border-slate-600 focus:ring-cyan-500" />
-                            <span>API Externa (Compatible)</span>
+                            <span>OpenRouter (API Externa)</span>
                         </label>
                     </fieldset>
 
@@ -130,26 +137,46 @@ const ApiConfigModal: React.FC<ApiConfigModalProps> = ({
                     {selectedProvider === 'external' && (
                         <div className="space-y-4">
                             <div>
-                                <label htmlFor="external-key-modal" className="block text-sm font-medium text-slate-300 mb-1">Clave de API Externa</label>
+                                <label htmlFor="external-key-modal" className="block text-sm font-medium text-slate-300 mb-1">Clave de API de OpenRouter</label>
                                 <input
                                     id="external-key-modal"
                                     type="password"
                                     value={externalKey}
                                     onChange={(e) => setExternalKey(e.target.value)}
-                                    placeholder="Introduce tu clave de API externa"
+                                    placeholder="sk-or-v1-..."
                                     className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                                 />
                             </div>
                             <div>
-                                <label htmlFor="external-endpoint-modal" className="block text-sm font-medium text-slate-300 mb-1">Endpoint de la API Externa</label>
+                                <label htmlFor="external-endpoint-modal" className="block text-sm font-medium text-slate-300 mb-1">Endpoint de OpenRouter</label>
                                 <input
                                     id="external-endpoint-modal"
                                     type="text"
                                     value={externalEndpoint}
                                     onChange={(e) => setExternalEndpoint(e.target.value)}
-                                    placeholder="Introduce la URL del endpoint de la API"
+                                    placeholder="https://openrouter.ai/api/v1/chat/completions"
                                     className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                                 />
+                            </div>
+                            <div>
+                                <label htmlFor="external-model-modal" className="block text-sm font-medium text-slate-300 mb-1">Modelo</label>
+                                <select
+                                    id="external-model-modal"
+                                    value={externalModel}
+                                    onChange={(e) => setExternalModel(e.target.value as OpenRouterModelId)}
+                                    className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                >
+                                    {OPENROUTER_MODELS.map((model) => (
+                                        <option key={model.id} value={model.id}>
+                                            {model.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-slate-400 mt-1">
+                                    {OPENROUTER_MODELS.find(m => m.id === externalModel)?.supportsImages 
+                                        ? '✓ Soporta imágenes' 
+                                        : '✗ No soporta imágenes'}
+                                </p>
                             </div>
                         </div>
                     )}
