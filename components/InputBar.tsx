@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ImageEditModal from './ImageEditModal';
+import { IMAGE_GENERATION_MODELS, ImageGenerationModel } from '../types';
 
 interface InputBarProps {
     onSend: (
         prompt: string, 
         images?: { mimeType:string, data: string }[],
-        options?: { isImageEditMode?: boolean, isImageGenerationMode?: boolean }
+        options?: { isImageEditMode?: boolean, isImageGenerationMode?: boolean, imageGenerationModel?: string }
     ) => void;
     isLoading: boolean;
     disabled?: boolean;
@@ -31,9 +32,11 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
     const [imageFiles, setImageFiles] = useState<File[]>([]);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [isImageGenerationMode, setIsImageGenerationMode] = useState(false);
+    const [selectedImageGenerationModel, setSelectedImageGenerationModel] = useState<string>(IMAGE_GENERATION_MODELS[0].id);
     const [imageFilters, setImageFilters] = useState<any[]>([]);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+    const [tooltipModel, setTooltipModel] = useState<ImageGenerationModel | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const isDisabled = isLoading || disabled;
@@ -165,7 +168,11 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
             imagePreviews.map((preview, index) => applyFiltersToImage(preview, imageFilters[index]))
         );
 
-        onSend(prompt, imagePayloads, { isImageEditMode: imageFiles.length > 0, isImageGenerationMode });
+        onSend(prompt, imagePayloads, { 
+            isImageEditMode: imageFiles.length > 0, 
+            isImageGenerationMode,
+            imageGenerationModel: isImageGenerationMode ? selectedImageGenerationModel : undefined
+        });
 
         setPrompt('');
         setImageFiles([]);
@@ -227,6 +234,55 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                                     </button>
                                 </div>
                             ))}
+                        </div>
+                    )}
+                    {isImageGenerationMode && (
+                        <div className="mb-3">
+                            <label className="text-sm text-slate-400 mb-1 block">Select Image Generation Model</label>
+                            <div className="relative">
+                                <select
+                                    value={selectedImageGenerationModel}
+                                    onChange={(e) => setSelectedImageGenerationModel(e.target.value)}
+                                    className="w-full bg-slate-700 text-slate-100 border border-slate-600 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent appearance-none cursor-pointer"
+                                >
+                                    {IMAGE_GENERATION_MODELS.map((model) => (
+                                        <option key={model.id} value={model.id}>
+                                            {model.provider} - {model.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
+                            </div>
+                            <div className="mt-2 flex items-center gap-2 text-sm">
+                                <span className="text-slate-300">
+                                    {IMAGE_GENERATION_MODELS.find(m => m.id === selectedImageGenerationModel)?.provider} - {IMAGE_GENERATION_MODELS.find(m => m.id === selectedImageGenerationModel)?.name}
+                                </span>
+                                <div className="relative">
+                                    <button
+                                        onMouseEnter={() => setTooltipModel(IMAGE_GENERATION_MODELS.find(m => m.id === selectedImageGenerationModel) || null)}
+                                        onMouseLeave={() => setTooltipModel(null)}
+                                        onClick={() => setTooltipModel(tooltipModel ? null : IMAGE_GENERATION_MODELS.find(m => m.id === selectedImageGenerationModel) || null)}
+                                        className="text-cyan-400 hover:text-cyan-300 transition-colors"
+                                        aria-label="Model information"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </button>
+                                    {tooltipModel && tooltipModel.id === selectedImageGenerationModel && (
+                                        <div className="absolute bottom-full left-0 mb-2 w-80 bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-3 z-50">
+                                            <div className="text-slate-100 font-semibold mb-1">{tooltipModel.name}</div>
+                                            <div className="text-cyan-400 text-xs mb-2">{tooltipModel.tokens}</div>
+                                            <div className="text-slate-300 text-sm leading-relaxed">{tooltipModel.description}</div>
+                                            <div className="absolute bottom-0 left-4 transform translate-y-1/2 rotate-45 w-2 h-2 bg-slate-800 border-r border-b border-slate-600"></div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     )}
                     <div className="relative flex items-end bg-slate-700 rounded-lg p-2 gap-1">

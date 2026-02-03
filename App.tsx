@@ -135,7 +135,7 @@ const App: React.FC = () => {
     const handleSend = useCallback(async (
         prompt: string, 
         images?: { mimeType: string, data: string }[],
-        options?: { isImageEditMode?: boolean, isImageGenerationMode?: boolean }
+        options?: { isImageEditMode?: boolean; isImageGenerationMode?: boolean; imageGenerationModel?: string }
     ) => {
         if (!prompt && (!images || images.length === 0)) return;
         if (!isApiConfigured) {
@@ -180,11 +180,16 @@ const App: React.FC = () => {
         if (apiProvider === 'gemini') {
             apiConfig = { provider: 'gemini', apiKey: geminiApiKey };
         } else {
+            // Use image generation model if in generation mode and a specific model is selected
+            const model = options?.isImageGenerationMode && options?.imageGenerationModel
+                ? options.imageGenerationModel
+                : externalApiModel;
+            
             apiConfig = { 
                 provider: 'external', 
                 apiKey: externalApiKey, 
                 endpoint: externalApiEndpoint,
-                model: externalApiModel 
+                model: model 
             };
         }
 
