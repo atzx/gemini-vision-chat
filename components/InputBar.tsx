@@ -34,6 +34,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
     const [isImageGenerationMode, setIsImageGenerationMode] = useState(false);
     const [selectedImageGenerationModel, setSelectedImageGenerationModel] = useState<string>(IMAGE_GENERATION_MODELS[0].id);
     const [imageFilters, setImageFilters] = useState<ImageFilters[]>([]);
+    const [imageDrawings, setImageDrawings] = useState<string[]>([]);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const [tooltipModel, setTooltipModel] = useState<ImageGenerationModel | null>(null);
@@ -71,6 +72,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                 reader.onloadend = () => {
                     setImagePreviews(prev => [...prev, reader.result as string]);
                     setImageFilters(prev => [...prev, { rotation: 0, inverted: false, sepia: false, grayscale: false, blur: 0, brightness: 100, contrast: 100 }]);
+                    setImageDrawings(prev => [...prev, '']);
                 };
                 reader.readAsDataURL(file);
             });
@@ -89,6 +91,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                     reader.onloadend = () => {
                         setImagePreviews(prev => [...prev, reader.result as string]);
                         setImageFilters(prev => [...prev, { rotation: 0, inverted: false, sepia: false, grayscale: false, blur: 0, brightness: 100, contrast: 100 }]);
+                        setImageDrawings(prev => [...prev, '']);
                     };
                     reader.readAsDataURL(file);
                 }
@@ -100,7 +103,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
     const handleSend = async () => {
         if (isDisabled || (!prompt.trim() && imageFiles.length === 0)) return;
 
-        const applyFiltersToImage = (imageUrl: string, filters: ImageFilters): Promise<{ mimeType: string, data: string }> => {
+        const applyFiltersToImage = (imageUrl: string, filters: ImageFilters, drawingData?: string): Promise<{ mimeType: string, data: string }> => {
             return new Promise((resolve, reject) => {
                 const img = new Image();
                 img.crossOrigin = 'anonymous';
@@ -147,7 +150,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                         tempCtx.putImageData(imageData, 0, 0);
                     }
 
-                    // Final canvas for rotation and CSS-based filters
+                    // Final canvas for rotation, CSS-based filters, and drawing overlay
                     const finalCanvas = document.createElement('canvas');
                     const finalCtx = finalCanvas.getContext('2d');
                     if (!finalCtx) return reject(new Error('Could not get canvas context'));
@@ -173,10 +176,34 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                     finalCtx.translate(finalCanvas.width / 2, finalCanvas.height / 2);
                     finalCtx.rotate(filters.rotation * Math.PI / 180);
                     finalCtx.drawImage(tempCanvas, -img.width / 2, -img.height / 2);
-
-                    const dataUrl = finalCanvas.toDataURL('image/png');
-                    const data = dataUrl.split(',')[1];
-                    resolve({ mimeType: 'image/png', data });
+                    
+                    // Reset transform and filter for overlay
+                    finalCtx.setTransform(1, 0, 0, 1, 0, 0);
+                    finalCtx.filter = 'none';
+                    
+                    // Apply drawing overlay if exists
+                    if (drawingData) {
+                        const drawingImg = new Image();
+                        drawingImg.onload = () => {
+                            // Scale drawing to match final canvas size
+                            finalCtx.drawImage(drawingImg, 0, 0, finalCanvas.width, finalCanvas.height);
+                            
+                            const dataUrl = finalCanvas.toDataURL('image/png');
+                            const data = dataUrl.split(',')[1];
+                            resolve({ mimeType: 'image/png', data });
+                        };
+                        drawingImg.onerror = () => {
+                            // If drawing fails, still return the filtered image
+                            const dataUrl = finalCanvas.toDataURL('image/png');
+                            const data = dataUrl.split(',')[1];
+                            resolve({ mimeType: 'image/png', data });
+                        };
+                        drawingImg.src = drawingData;
+                    } else {
+                        const dataUrl = finalCanvas.toDataURL('image/png');
+                        const data = dataUrl.split(',')[1];
+                        resolve({ mimeType: 'image/png', data });
+                    }
                 };
                 img.onerror = reject;
                 img.src = imageUrl;
@@ -184,7 +211,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
         };
 
         const imagePayloads = await Promise.all(
-            imagePreviews.map((preview, index) => applyFiltersToImage(preview, imageFilters[index]))
+            imagePreviews.map((preview, index) => applyFiltersToImage(preview, imageFilters[index], imageDrawings[index]))
         );
 
         onSend(prompt, imagePayloads, { 
@@ -197,6 +224,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
         setImageFiles([]);
         setImagePreviews([]);
         setImageFilters([]);
+        setImageDrawings([]);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -213,13 +241,22 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
         setImageFiles(prev => prev.filter((_, i) => i !== index));
         setImagePreviews(prev => prev.filter((_, i) => i !== index));
         setImageFilters(prev => prev.filter((_, i) => i !== index));
+        setImageDrawings(prev => prev.filter((_, i) => i !== index));
         if(fileInputRef.current) {
             fileInputRef.current.value = '';
         }
     };
 
-    const handleUpdateFilters = (index: number, filters: ImageFilters) => {
+    const handleUpdateFilters = (index: number, filters: ImageFilters, drawingData?: string) => {
         setImageFilters(prev => prev.map((f, i) => i === index ? filters : f));
+        // Store drawing data if provided
+        if (drawingData) {
+            setImageDrawings(prev => {
+                const newDrawings = [...prev];
+                newDrawings[index] = drawingData;
+                return newDrawings;
+            });
+        }
     };
 
     return (
