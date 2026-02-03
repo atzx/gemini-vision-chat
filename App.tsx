@@ -206,13 +206,6 @@ const App: React.FC = () => {
                     model: externalApiModel 
                 };
                 modelParts = await runQuery(fallbackConfig, prompt, images, options);
-                
-                // Add a note about the fallback
-                if (!modelParts[0]?.text?.startsWith('Error:')) {
-                    modelParts.push({ 
-                        text: "\n\n*(Image generated using OpenRouter fallback due to Gemini billing requirements)*" 
-                    });
-                }
             } else if (options?.isImageGenerationMode && 
                        apiProvider === 'gemini' && 
                        errorText.includes('billing enabled')) {
