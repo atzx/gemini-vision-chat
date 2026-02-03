@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ImageEditModal from './ImageEditModal';
-import { IMAGE_GENERATION_MODELS, ImageGenerationModel } from '../types';
+import { IMAGE_GENERATION_MODELS, ImageGenerationModel, ImageFilters } from '../types';
 
 interface InputBarProps {
     onSend: (
@@ -33,7 +33,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [isImageGenerationMode, setIsImageGenerationMode] = useState(false);
     const [selectedImageGenerationModel, setSelectedImageGenerationModel] = useState<string>(IMAGE_GENERATION_MODELS[0].id);
-    const [imageFilters, setImageFilters] = useState<any[]>([]);
+    const [imageFilters, setImageFilters] = useState<ImageFilters[]>([]);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const [tooltipModel, setTooltipModel] = useState<ImageGenerationModel | null>(null);
@@ -70,7 +70,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                 const reader = new FileReader();
                 reader.onloadend = () => {
                     setImagePreviews(prev => [...prev, reader.result as string]);
-                    setImageFilters(prev => [...prev, { rotation: 0, inverted: false, sepia: false }]);
+                    setImageFilters(prev => [...prev, { rotation: 0, inverted: false, sepia: false, grayscale: false, blur: 0, brightness: 100, contrast: 100 }]);
                 };
                 reader.readAsDataURL(file);
             });
@@ -88,7 +88,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                     const reader = new FileReader();
                     reader.onloadend = () => {
                         setImagePreviews(prev => [...prev, reader.result as string]);
-                        setImageFilters(prev => [...prev, { rotation: 0, inverted: false, sepia: false }]);
+                        setImageFilters(prev => [...prev, { rotation: 0, inverted: false, sepia: false, grayscale: false, blur: 0, brightness: 100, contrast: 100 }]);
                     };
                     reader.readAsDataURL(file);
                 }
@@ -100,12 +100,12 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
     const handleSend = async () => {
         if (isDisabled || (!prompt.trim() && imageFiles.length === 0)) return;
 
-        const applyFiltersToImage = (imageUrl: string, filters: any): Promise<{ mimeType: string, data: string }> => {
+        const applyFiltersToImage = (imageUrl: string, filters: ImageFilters): Promise<{ mimeType: string, data: string }> => {
             return new Promise((resolve, reject) => {
                 const img = new Image();
                 img.crossOrigin = 'anonymous';
                 img.onload = () => {
-                    // Temp canvas for filtering
+                    // Temp canvas for pixel-based filtering
                     const tempCanvas = document.createElement('canvas');
                     const tempCtx = tempCanvas.getContext('2d');
                     if (!tempCtx) return reject(new Error('Could not get canvas context'));
@@ -113,16 +113,19 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                     tempCanvas.height = img.height;
                     tempCtx.drawImage(img, 0, 0);
 
-                    if (filters.inverted || filters.sepia) {
+                    // Apply pixel-based filters (invert, sepia, grayscale)
+                    if (filters.inverted || filters.sepia || filters.grayscale) {
                         const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
                         const data = imageData.data;
                         for (let i = 0; i < data.length; i += 4) {
                             let r = data[i], g = data[i + 1], b = data[i + 2];
+                            
                             if (filters.inverted) {
                                 r = 255 - r;
                                 g = 255 - g;
                                 b = 255 - b;
                             }
+                            
                             if (filters.sepia) {
                                 const sr = r * 0.393 + g * 0.769 + b * 0.189;
                                 const sg = r * 0.349 + g * 0.686 + b * 0.168;
@@ -131,6 +134,12 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                                 g = Math.min(255, sg);
                                 b = Math.min(255, sb);
                             }
+                            
+                            if (filters.grayscale) {
+                                const gray = r * 0.299 + g * 0.587 + b * 0.114;
+                                r = g = b = gray;
+                            }
+                            
                             data[i] = r;
                             data[i + 1] = g;
                             data[i + 2] = b;
@@ -138,7 +147,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                         tempCtx.putImageData(imageData, 0, 0);
                     }
 
-                    // Final canvas for rotation
+                    // Final canvas for rotation and CSS-based filters
                     const finalCanvas = document.createElement('canvas');
                     const finalCtx = finalCanvas.getContext('2d');
                     if (!finalCtx) return reject(new Error('Could not get canvas context'));
@@ -149,6 +158,16 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                     } else {
                         finalCanvas.width = img.width;
                         finalCanvas.height = img.height;
+                    }
+
+                    // Apply CSS filters (blur, brightness, contrast)
+                    const cssFilters: string[] = [];
+                    if (filters.blur > 0) cssFilters.push(`blur(${filters.blur}px)`);
+                    if (filters.brightness !== 100) cssFilters.push(`brightness(${filters.brightness}%)`);
+                    if (filters.contrast !== 100) cssFilters.push(`contrast(${filters.contrast}%)`);
+                    
+                    if (cssFilters.length > 0) {
+                        finalCtx.filter = cssFilters.join(' ');
                     }
 
                     finalCtx.translate(finalCanvas.width / 2, finalCanvas.height / 2);
@@ -199,7 +218,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
         }
     };
 
-    const handleUpdateFilters = (index: number, filters: any) => {
+    const handleUpdateFilters = (index: number, filters: ImageFilters) => {
         setImageFilters(prev => prev.map((f, i) => i === index ? filters : f));
     };
 

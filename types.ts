@@ -12,6 +12,17 @@ export interface ChatMessage {
   parts: MessagePart[];
 }
 
+// Image Editor Filters Interface
+export interface ImageFilters {
+  rotation: number;
+  inverted: boolean;
+  sepia: boolean;
+  grayscale: boolean;
+  blur: number;
+  brightness: number;
+  contrast: number;
+}
+
 // OpenRouter general model options
 export const OPENROUTER_MODELS = [
   { id: 'google/gemini-2.5-flash-image', name: 'Gemini 2.5 Flash Image', supportsImages: true },
