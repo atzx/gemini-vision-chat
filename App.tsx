@@ -13,8 +13,23 @@ const App: React.FC = () => {
     const [isApiModalOpen, setIsApiModalOpen] = useState<boolean>(false);
 
     // API State Management
-    const [apiProvider, setApiProvider] = useState<'gemini' | 'external'>(() => (localStorage.getItem('apiProvider') as 'gemini' | 'external') || 'gemini');
-    const [geminiApiKey, setGeminiApiKey] = useState<string>(() => localStorage.getItem('geminiApiKey') || 'USE_GOOGLE_AI_STUDIO');
+    // Get API key from .env.local (set by Vite during build)
+    const envApiKey = process.env.GEMINI_API_KEY || '';
+    
+    // Use Gemini as default provider, but allow localStorage override
+    const [apiProvider, setApiProvider] = useState<'gemini' | 'external'>(() => {
+        const savedProvider = localStorage.getItem('apiProvider') as 'gemini' | 'external';
+        // If there's an env API key, default to Gemini unless user explicitly chose external
+        return savedProvider || 'gemini';
+    });
+    
+    // Use env API key as default for Gemini, but allow localStorage override
+    const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
+        const savedKey = localStorage.getItem('geminiApiKey');
+        // Priority: 1) localStorage if user set it, 2) env variable, 3) placeholder
+        return savedKey || envApiKey || 'USE_GOOGLE_AI_STUDIO';
+    });
+    
     const [externalApiKey, setExternalApiKey] = useState<string>(() => localStorage.getItem('externalApiKey') || '');
     const [externalApiEndpoint, setExternalApiEndpoint] = useState<string>(() => localStorage.getItem('externalApiEndpoint') || 'https://api.openai.com/v1/chat/completions');
 
@@ -22,6 +37,16 @@ const App: React.FC = () => {
     useEffect(() => { localStorage.setItem('geminiApiKey', geminiApiKey); }, [geminiApiKey]);
     useEffect(() => { localStorage.setItem('externalApiKey', externalApiKey); }, [externalApiKey]);
     useEffect(() => { localStorage.setItem('externalApiEndpoint', externalApiEndpoint); }, [externalApiEndpoint]);
+
+    // Auto-switch to Gemini if env key is available but provider is external
+    // This fixes the issue where users had external provider configured but want to use .env.local
+    useEffect(() => {
+        if (envApiKey && envApiKey !== 'USE_GOOGLE_AI_STUDIO' && apiProvider === 'external') {
+            console.log('Detected Gemini API key in .env.local, switching from External to Gemini provider');
+            setApiProvider('gemini');
+            setGeminiApiKey(envApiKey);
+        }
+    }, [envApiKey, apiProvider]);
 
     const isApiConfigured = (apiProvider === 'gemini' && !!geminiApiKey) || (apiProvider === 'external' && !!externalApiKey && !!externalApiEndpoint);
 
@@ -102,9 +127,16 @@ const App: React.FC = () => {
         }
     }, [apiProvider, geminiApiKey, externalApiKey, externalApiEndpoint, isApiConfigured]);
 
+    // Determine if using env API key
+    const isUsingEnvKey = geminiApiKey === envApiKey && envApiKey !== '' && envApiKey !== 'USE_GOOGLE_AI_STUDIO';
+
     return (
         <div className="flex flex-col h-screen bg-slate-900 text-white">
-            <Header onOpenApiModal={() => setIsApiModalOpen(true)} />
+            <Header 
+                onOpenApiModal={() => setIsApiModalOpen(true)} 
+                apiProvider={apiProvider}
+                isUsingEnvKey={isUsingEnvKey}
+            />
             <ApiConfigModal
                 isOpen={isApiModalOpen}
                 onClose={() => setIsApiModalOpen(false)}

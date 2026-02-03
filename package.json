@@ -10,12 +10,13 @@
   },
   "dependencies": {
     "@google/genai": "^1.21.0",
-    "react-dom": "^19.1.1",
-    "react": "^19.1.1"
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "baseline-browser-mapping": "^2.9.19",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

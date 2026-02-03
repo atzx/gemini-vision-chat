@@ -261,7 +261,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                     </button>
                      <button
                         onClick={() => setIsImageGenerationMode(prev => !prev)}
-                        disabled={isDisabled || imageFiles.length > 0 || !prompt.trim()}
+                        disabled={isDisabled || imageFiles.length > 0}
                         className={`p-2 rounded-lg transition-colors ${
                             isImageGenerationMode ? 'bg-cyan-500 text-white' : 'text-slate-400'
                         } hover:text-cyan-400 disabled:opacity-50 disabled:hover:text-slate-400 disabled:cursor-not-allowed`}
@@ -276,7 +276,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
                         ref={textareaRef}
-                        placeholder={disabled ? "Please configure your API key in the header." : "Type your message or add an image..."}
+                        placeholder={disabled ? "Please configure your API key in the header." : isImageGenerationMode ? "Describe the image you want to generate..." : "Type your message or add an image..."}
                         className="flex-1 bg-transparent resize-none focus:outline-none p-2 text-slate-100 placeholder-slate-400 max-h-[18rem] overflow-y-auto"
                         rows={1}
                         disabled={isDisabled}
