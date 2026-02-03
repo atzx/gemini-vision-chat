@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import ImageModal from './ImageModal';
 
 interface ImageMetadata {
   filename: string;
@@ -24,6 +25,7 @@ const ImageHistory: React.FC<ImageHistoryProps> = ({ onImageClick }) => {
   const [editTitle, setEditTitle] = useState('');
   const [selectedImage, setSelectedImage] = useState<ImageMetadata | null>(null);
   const [serverStatus, setServerStatus] = useState<'connected' | 'disconnected'>('disconnected');
+  const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
 
   // Cargar imágenes al montar el componente
   const loadImages = useCallback(async () => {
@@ -192,6 +194,10 @@ const ImageHistory: React.FC<ImageHistoryProps> = ({ onImageClick }) => {
                 setSelectedImage(image);
                 onImageClick?.(image);
               }}
+              onDoubleClick={() => {
+                setModalImageUrl(`${API_BASE_URL}${image.url}`);
+              }}
+              title="Doble clic para maximizar"
             >
               {/* Thumbnail */}
               <div className="aspect-square bg-slate-900">
@@ -290,6 +296,14 @@ const ImageHistory: React.FC<ImageHistoryProps> = ({ onImageClick }) => {
           )}
         </div>
       </div>
+
+      {/* Modal para maximizar imagen */}
+      {modalImageUrl && (
+        <ImageModal
+          imageUrl={modalImageUrl}
+          onClose={() => setModalImageUrl(null)}
+        />
+      )}
     </div>
   );
 };
