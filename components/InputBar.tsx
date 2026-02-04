@@ -256,6 +256,12 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, disabled = false
                 newDrawings[index] = drawingData;
                 return newDrawings;
             });
+            // Update the preview to show the edited version (including drawing)
+            setImagePreviews(prev => {
+                const newPreviews = [...prev];
+                newPreviews[index] = drawingData;
+                return newPreviews;
+            });
         }
     };
 
